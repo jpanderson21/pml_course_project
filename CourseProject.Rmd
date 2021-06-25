@@ -1,0 +1,89 @@
+---
+title: "Course Project - Practical Machine Learning"
+author: "JP Anderson"
+date: "6/25/2021"
+output:
+  html_document: default
+  pdf_document: default
+---
+ 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+ 
+## Step 1: Load the Data
+ 
+```{r}
+training = read.csv('pml-training.csv')
+```
+ 
+## Step 2: Prep the Data
+ 
+Remove the rows where new_window = yes, as I'm not sure what these rows are (they have a lot of extra columns populated), and the test set only has rows with new_window = no.
+```{r}
+training = training[training$new_window == 'no',]
+```
+ 
+Select the columns I want. In particular, I'm removing the following columns:\
+1. Row number. Even if this corresponded to a missing variable, I wouldn't have it in the test set.\
+2. Columns corresponding to user or time. I want my model to predict independent of who performed the exercises or when they were performed.\
+3. Columns that are only populated for new_window = yes. They are of no use since I'm not modeling on those rows.\
+```{r}
+training = training[,c('roll_belt','pitch_belt','yaw_belt','total_accel_belt','gyros_belt_x',
+                            'gyros_belt_y','gyros_belt_z','accel_belt_x','accel_belt_y',
+                            'accel_belt_z','magnet_belt_x','magnet_belt_y','magnet_belt_z',
+                            'roll_arm','pitch_arm','yaw_arm','total_accel_arm','gyros_arm_x',
+                            'gyros_arm_y','gyros_arm_z','accel_arm_x','accel_arm_y','accel_arm_z',
+                            'magnet_arm_x','magnet_arm_y','magnet_arm_z','roll_dumbbell',
+                            'pitch_dumbbell','yaw_dumbbell','total_accel_dumbbell',
+                            'gyros_dumbbell_x','gyros_dumbbell_y','gyros_dumbbell_z',
+                            'accel_dumbbell_x','accel_dumbbell_y','accel_dumbbell_z',
+                            'magnet_dumbbell_x','magnet_dumbbell_y','magnet_dumbbell_z',
+                            'roll_forearm','pitch_forearm','yaw_forearm','total_accel_forearm',
+                            'gyros_forearm_x','gyros_forearm_y','gyros_forearm_z',
+                            'accel_forearm_x','accel_forearm_y','accel_forearm_z',
+                            'magnet_forearm_x','magnet_forearm_y','magnet_forearm_z','classe')]
+```
+ 
+## Step 3: Build the Model
+ 
+I decided to go with a GBM:\
+1. GBMs handle complex interactions well, which is probably necessary for modeling data from movement sensors.\
+2. This is a classification problem that seems unlikely to have a linear relationship with the predictors.\
+3. Model interpretability is not important for this project.\
+ 
+Load the caret library.
+```{r message=FALSE, warning=FALSE}
+library(caret)
+```
+ 
+Create a grid for parameter tuning.
+```{r}
+grid = expand.grid(interaction.depth = c(1,2,3),
+                   n.trees = c(100,500),
+                   shrinkage = 0.1,
+                   n.minobsinnode = c(10,50))
+```
+ 
+Do cross-validation with 10-folds repeated 3 times.
+```{r}
+control = trainControl(method = 'repeatedcv',
+                       number = 10,
+                       repeats = 3)
+```
+ 
+Train the model.
+```{r eval=FALSE}
+set.seed(123)
+fit = train(classe ~ ., data = training, method = 'gbm', trControl = control, tuneGrid = grid)
+```
+ 
+## Conclusion
+Using accuracy to find the optimal model, the following tuning parameters were selected by the train function:\
+n.trees = 500\
+interaction.depth = 3\
+shrinkage = 0.1\
+n.minobsinnode = 50\
+ 
+The accuracy for that combination was 0.9934084. Based on that result, I would anticipate out of sample error to be under 1%.
+However, if the model is substantially overfit to the training data, the out of sample error may be higher than that.
